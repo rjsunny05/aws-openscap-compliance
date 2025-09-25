@@ -3,106 +3,69 @@ set -euo pipefail
 set -x
 
 # ========== PARAMETERS ==========
-WORKSPACE="$1"           # Jenkins workspace (passed from Jenkinsfile)
-AWS_REGION="$2"          # AWS region (passed from Jenkinsfile)
-SSM_FILE="$WORKSPACE/ssm_inventory.csv"
+WORKSPACE="$1"        # Jenkins workspace (passed from Jenkinsfile)
 REPORT_DEST="$WORKSPACE/openscap_reports"
-SSH_KEY="$SSH_AUTH_SOCK" # SSH agent provided by Jenkins (no hardcoding)
+SSH_USER="$2"         # e.g., ec2-user
+SSH_KEY="$SSH_AUTH_SOCK" # SSH agent provided by Jenkins
+PROFILE="$3"          # OpenSCAP profile to use, e.g., xccdf_org.ssgproject.content_profile_cis
+TAILORING_FILE_DIR="$4" # Directory in workspace containing tailoring XMLs
+CONTENT_FILE_DIR="$5"   # Directory in workspace containing profile XMLs
+
+# List of instance private IPs to scan
+INSTANCES=("10.0.1.10" "10.0.1.11") # Replace with your EC2 private IPs
 
 mkdir -p "$REPORT_DEST"
 
-echo "[INFO] Fetching instance metadata..."
-
-# ========== FETCH INSTANCE METADATA ==========
-# Example: using AWS CLI SSM describe-instance-information
-aws ssm describe-instance-information \
-  --region "$AWS_REGION" \
-  --query 'InstanceInformationList[*].[ComputerName,IPAddress,PlatformName,PlatformVersion]' \
-  --output text > "$SSM_FILE"
-
-echo "[INFO] Inventory saved to $SSM_FILE"
+echo "[INFO] Starting OpenSCAP scans on ${#INSTANCES[@]} instances..."
 
 # ========== SCAN FUNCTION ==========
 run_scan() {
     local ip="$1"
-    local os_name="$2"
-    local os_version="$3"
-    local profile="$4"
-    local tailoring="$5"
+    local profile="$2"
+    local tailoring_file="$3"
 
-    echo "[INFO] Starting scan for $os_name $os_version ($ip)"
+    echo "[INFO] Starting scan for $ip"
 
-    # Copy content & tailoring files to instance
-    scp -o StrictHostKeyChecking=no content/* ec2-user@"$ip":/tmp/
-    scp -o StrictHostKeyChecking=no tailoring/* ec2-user@"$ip":/tmp/
+    # Copy content and tailoring files to the instance
+    scp -o StrictHostKeyChecking=no "$CONTENT_FILE_DIR/$profile.xml" "$SSH_USER@$ip:/tmp/"
+    scp -o StrictHostKeyChecking=no "$TAILORING_FILE_DIR/$tailoring_file" "$SSH_USER@$ip:/tmp/"
 
     # -------- PRECHECK SCAN --------
     echo "[INFO] Running precheck scan on $ip..."
-    SCAN_OUTPUT=$(ssh -o StrictHostKeyChecking=no ec2-user@"$ip" \
-      "oscap xccdf eval --profile $profile \
-       --tailoring-file /tmp/$tailoring \
-       /tmp/$profile.xml 2>&1 || true")
+    SCAN_OUTPUT=$(ssh -o StrictHostKeyChecking=no "$SSH_USER@$ip" \
+        "oscap xccdf eval --profile $profile --tailoring-file /tmp/$tailoring_file /tmp/$profile.xml 2>&1 || true")
 
     # -------- PATCH FAILED RULES --------
     FAIL_RULES=$(echo "$SCAN_OUTPUT" | awk '/Result: (fail|notchecked|notapplicable)/ {print $2}')
     if [[ -n "$FAIL_RULES" ]]; then
         echo "[INFO] Patching tailoring XML on $ip for rules: $FAIL_RULES"
         for rule in $FAIL_RULES; do
-            ssh -o StrictHostKeyChecking=no ec2-user@"$ip" \
-              "sudo sed -i \"s|<rule id='$rule' selected='true'/>|<rule id='$rule' selected='false'/>|g\" /tmp/$tailoring"
+            ssh -o StrictHostKeyChecking=no "$SSH_USER@$ip" \
+              "sudo sed -i \"s|<rule id='$rule' selected='true'/>|<rule id='$rule' selected='false'/>|g\" /tmp/$tailoring_file"
         done
     fi
 
     # -------- FINAL SCAN --------
     echo "[INFO] Running final scan on $ip..."
-    ssh -o StrictHostKeyChecking=no ec2-user@"$ip" \
-      "oscap xccdf eval --profile $profile \
-       --tailoring-file /tmp/$tailoring \
-       --report /tmp/report_${ip}.html \
-       /tmp/$profile.xml"
+    ssh -o StrictHostKeyChecking=no "$SSH_USER@$ip" \
+        "oscap xccdf eval --profile $profile --tailoring-file /tmp/$tailoring_file --report /tmp/report_${ip}.html /tmp/$profile.xml"
 
     # -------- COPY REPORT --------
-    scp -o StrictHostKeyChecking=no ec2-user@"$ip":/tmp/report_${ip}.html "$REPORT_DEST/" || {
-        echo "[WARN] Failed to copy report from $ip. Report remains on instance."
-    }
+    scp -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/report_${ip}.html" "$REPORT_DEST/"
 
     # -------- CLEANUP --------
-    ssh -o StrictHostKeyChecking=no ec2-user@"$ip" "rm -f /tmp/report_${ip}.html /tmp/*.xml"
+    ssh -o StrictHostKeyChecking=no "$SSH_USER@$ip" "rm -f /tmp/report_${ip}.html /tmp/$profile.xml /tmp/$tailoring_file"
+
     echo "[OK] Report generated: $REPORT_DEST/report_${ip}.html"
 }
 
 # ========== MAIN LOOP ==========
-while IFS=$'\t' read -r name private_ip platform_name platform_version; do
-    if [[ "$name" == "unknown" || -z "$platform_name" ]]; then
-        echo "[SKIP] Instance $private_ip has unknown name or OS"
-        continue
-    fi
+for ip in "${INSTANCES[@]}"; do
+    # Decide which tailoring file to use (example for Amazon Linux 2)
+    PROFILE_NAME="$PROFILE"
+    TAILORING_FILE="amazonlinux2-tailoring.xml"
 
-    case "$platform_name" in
-        "CentOS Linux")
-            if [[ "$platform_version" == "7.6" ]]; then
-                run_scan "$private_ip" "CentOS" "7.6" "xccdf_org.ssgproject.content_profile_cis" "centos-7.6-tailoring.xml"
-            elif [[ "$platform_version" == "7.9" ]]; then
-                run_scan "$private_ip" "CentOS" "7.9" "xccdf_org.ssgproject.content_profile_cis" "centos-7.9-tailoring.xml"
-            fi
-            ;;
-        "Amazon Linux")
-            if [[ "$platform_version" == "2" ]]; then
-                run_scan "$private_ip" "Amazon Linux" "2" "xccdf_org.ssgproject.content_profile_cis" "amazonlinux2-tailoring.xml"
-            elif [[ "$platform_version" == "2023" ]]; then
-                ssh -o StrictHostKeyChecking=no ec2-user@"$private_ip" "sudo yum install -y openscap-scanner"
-                run_scan "$private_ip" "Amazon Linux" "2023" "xccdf_org.ssgproject.content_profile_cis" "amazonlinux2023-tailoring.xml"
-            fi
-            ;;
-        "Ubuntu")
-            if [[ "$platform_version" == "22.04" ]]; then
-                run_scan "$private_ip" "Ubuntu" "22.04" "xccdf_org.ssgproject.content_profile_cis" "ubuntu2204-tailoring.xml"
-            fi
-            ;;
-        *)
-            echo "[SKIP] Unsupported OS: $platform_name $platform_version"
-            ;;
-    esac
-done < "$SSM_FILE"
+    run_scan "$ip" "$PROFILE_NAME" "$TAILORING_FILE"
+done
 
 echo "[INFO] All scans completed. Reports saved at: $REPORT_DEST"

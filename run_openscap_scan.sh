@@ -64,7 +64,7 @@ for label in "${!platform_filters[@]}"; do
   echo ""
 done
 
-SSH_KEY="/home/khushi.m/key.pem"
+SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="/home/khushi.m/openscap_reports"
 FOLDER_NAME="customCentos7_6_1810"
 
@@ -149,7 +149,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
     fi
 done
 
-SSH_KEY="/home/khushi.m/key.pem"
+SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="/home/khushi.m/openscap_reports"
 FOLDER_NAME="customCentos7_9_2009"
 
@@ -235,7 +235,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
 done
 
 
-SSH_KEY="/home/khushi.m/key.pem"
+SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="/home/khushi.m/openscap_reports"
 FOLDER_NAME="customAmazon2"
 
@@ -322,7 +322,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
 done
 
 # Amazon Linux 2023 - OpenSCAP Scan Section
-SSH_KEY="/home/khushi.m/key.pem"
+SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="/home/khushi.m/openscap_reports"
 FOLDER_NAME="customAmazon2023"
 SSM_FILE="/home/khushi.m/ssm.txt"
@@ -426,7 +426,7 @@ tail -n +2 "$SSM_FILE" | while IFS=, read -r name ip platform version; do
     fi
 done
 
-SSH_KEY="/home/khushi.m/key.pem"
+SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="/home/khushi.m/openscap_reports"
 FOLDER_NAME="customUbuntu22.04"
 

@@ -3,6 +3,8 @@
 #set -euo pipefail
 set -x
 
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 SSM_FILE="/home/khushi.m/ssm.txt"
 echo "[INFO] Fetching instance metadata..."
 
@@ -83,7 +85,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "/home/khushi.m/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "${SCRIPT_DIR}/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
 
             echo "[INFO] Files in /tmp/$FOLDER_NAME:"
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "ls -1 /tmp/$FOLDER_NAME"
@@ -168,7 +170,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "/home/khushi.m/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "${SCRIPT_DIR}/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
 
             echo "[INFO] Files in /tmp/$FOLDER_NAME:"
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "ls -1 /tmp/$FOLDER_NAME"
@@ -255,7 +257,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying $FOLDER_NAME to $ip:/tmp/ ..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "/home/khushi.m/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "${SCRIPT_DIR}/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
 
             echo "[INFO] Files in /tmp/$FOLDER_NAME:"
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "ls -1 /tmp/$FOLDER_NAME"
@@ -352,7 +354,7 @@ tail -n +2 "$SSM_FILE" | while IFS=, read -r name ip platform version; do
         ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo yum install -y openscap-scanner" >/dev/null 2>&1
 
         echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
-        scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "/home/khushi.m/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/" || {
+        scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "${SCRIPT_DIR}/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/" || {
             echo "[ERROR] Failed to copy files to $ip"
             continue
         }
@@ -445,7 +447,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "/home/khushi.m/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -r "${SCRIPT_DIR}/profiles/$FOLDER_NAME" "$SSH_USER@$ip:/tmp/"
 
             echo "[INFO] Files in /tmp/$FOLDER_NAME:"
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "ls -1 /tmp/$FOLDER_NAME"

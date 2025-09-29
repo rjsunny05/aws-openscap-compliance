@@ -25,22 +25,19 @@ os_choice="${TARGET_OS_FILTER:-"All"}"
 # Use a case statement to select the best filter for the chosen OS.
 case "$os_choice" in
     Rhel | RHEL)
-        # For RHEL, we use the most reliable 'platform' filter.
-        aws_filter_array+=("Name=platform,Values=redhat")
-        echo "[INFO] Filtering for OS type: RHEL (using platform details)"
+        # Use the Name tag filter for all OS types for consistency.
+        aws_filter_array+=("Name=tag:Name,Values=*rhel*")
+        echo "[INFO] Filtering for OS type: RHEL (using Name tag)"
         ;;
     Ubuntu | ubuntu)
-        # The 'platform' filter isn't available for Ubuntu. We fall back to the Name tag.
         aws_filter_array+=("Name=tag:Name,Values=*ubuntu*")
         echo "[INFO] Filtering for OS type: Ubuntu (using Name tag)"
         ;;
     Centos | centos)
-        # The 'platform' filter isn't available for CentOS. We fall back to the Name tag.
         aws_filter_array+=("Name=tag:Name,Values=*centos*")
         echo "[INFO] Filtering for OS type: CentOS (using Name tag)"
         ;;
     AmazonLinux | amazonlinux)
-        # The 'platform' filter isn't available for Amazon Linux. We fall back to the Name tag.
         aws_filter_array+=("Name=tag:Name,Values=*amazon*linux*,*amzn*")
         echo "[INFO] Filtering for OS type: Amazon Linux (using Name tag)"
         ;;
@@ -54,7 +51,6 @@ case "$os_choice" in
 esac
 
 # Pass the filter array to the AWS CLI command.
-# This ensures each filter is passed as a separate, correctly quoted argument.
 readarray -t INSTANCES < <(aws ec2 describe-instances \
   --filters "${aws_filter_array[@]}" \
   --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \

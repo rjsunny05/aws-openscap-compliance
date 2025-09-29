@@ -6,7 +6,7 @@ set -x
 WORKSPACE="$1"
 SSH_KEY="$2"
 PROFILE="$3"
-# The rest (TARGET_OS, SCAN_ALL_INSTANCES, etc.) are read from environment variables
+# The rest (TARGET_OS_FILTER, SCAN_ALL_INSTANCES, etc.) are read from environment variables
 
 # ========== DERIVED PARAMETERS ==========
 TAILORING_FILE_DIR="$WORKSPACE/tailoring"
@@ -16,16 +16,35 @@ mkdir -p "$REPORT_DEST"
 # Convert excluded IPs to an array
 IFS=',' read -r -a EXCLUDED_ARRAY <<< "${EXCLUDED_IPS:-""}"
 
-# ========== INSTANCE DISCOVERY ==========
+# ========== INSTANCE DISCOVERY (UPDATED) ==========
 echo "[INFO] Fetching EC2 instances from AWS..."
+
+# Default filter gets all running instances
+aws_filter="Name=instance-state-name,Values=running"
+
+# Add an OS-specific filter based on the parameter from Jenkins, if not 'All'
+# This works by filtering on the 'Name' tag of the instance.
+os_choice="${TARGET_OS_FILTER:-"All"}" # Default to "All" if variable isn't set
+if [[ "$os_choice" != "All" ]]; then
+    os_tag_value="*${os_choice,,}*" # Convert to lowercase and add wildcards (e.g., *ubuntu*)
+    
+    # For Amazon Linux, the tag might be 'amazon-linux-server' or similar
+    if [[ "$os_choice" == "AmazonLinux" ]]; then
+        os_tag_value="*amazon*linux*"
+    fi
+    
+    aws_filter="$aws_filter Name=tag:Name,Values=$os_tag_value"
+    echo "[INFO] Filtering for OS type: $os_choice"
+fi
+
 if [[ "${SCAN_ALL_INSTANCES:-false}" == "true" ]]; then
-    # Get all running instances in the region
+    # Get instances based on the constructed filter
     readarray -t INSTANCES < <(aws ec2 describe-instances \
-      --filters "Name=instance-state-name,Values=running" \
+      --filters $aws_filter \
       --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \
       --output text)
 else
-    # Get only user-specified instances
+    # Get only user-specified instances (this logic remains the same)
     instance_ids_for_cli=$(echo "$INSTANCE_IDS" | tr ',' ' ')
     readarray -t INSTANCES < <(aws ec2 describe-instances \
       --instance-ids $instance_ids_for_cli \

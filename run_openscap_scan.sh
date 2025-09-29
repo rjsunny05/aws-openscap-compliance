@@ -67,7 +67,7 @@ for label in "${!platform_filters[@]}"; do
 done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
-REPORT_DEST="/home/khushi.m/openscap_reports"
+REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 FOLDER_NAME="customCentos7_6_1810"
 
 echo ""
@@ -152,7 +152,7 @@ tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform versi
 done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
-REPORT_DEST="/home/khushi.m/openscap_reports"
+REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 FOLDER_NAME="customCentos7_9_2009"
 
 echo ""
@@ -238,7 +238,7 @@ done
 
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
-REPORT_DEST="/home/khushi.m/openscap_reports"
+REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 FOLDER_NAME="customAmazon2"
 
 echo ""
@@ -325,7 +325,7 @@ done
 
 # Amazon Linux 2023 - OpenSCAP Scan Section
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
-REPORT_DEST="/home/khushi.m/openscap_reports"
+REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 FOLDER_NAME="customAmazon2023"
 SSM_FILE="${SCRIPT_DIR}/ssm.txt"
 
@@ -429,7 +429,7 @@ tail -n +2 "$SSM_FILE" | while IFS=, read -r name ip platform version; do
 done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
-REPORT_DEST="/home/khushi.m/openscap_reports"
+REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 FOLDER_NAME="customUbuntu22.04"
 
 echo ""

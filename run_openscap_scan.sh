@@ -6,51 +6,38 @@ set -x
 WORKSPACE="$1"
 SSH_KEY="$2"
 PROFILE="$3"
-# The rest (TARGET_OS_FILTER, SCAN_ALL_INSTANCES, etc.) are read from environment variables
+# The rest (TARGET_OS_FILTER, EXCLUDED_INSTANCE_IDS, etc.) are read from environment variables
 
 # ========== DERIVED PARAMETERS ==========
 TAILORING_FILE_DIR="$WORKSPACE/tailoring"
 REPORT_DEST="$WORKSPACE/openscap_reports"
 mkdir -p "$REPORT_DEST"
 
-# Convert excluded IPs to an array
-IFS=',' read -r -a EXCLUDED_ARRAY <<< "${EXCLUDED_IPS:-""}"
+# UPDATED: Convert excluded INSTANCE IDs to an array
+IFS=',' read -r -a EXCLUDED_ID_ARRAY <<< "${EXCLUDED_INSTANCE_IDS:-""}"
 
-# ========== INSTANCE DISCOVERY (UPDATED) ==========
+# ========== INSTANCE DISCOVERY (SIMPLIFIED) ==========
 echo "[INFO] Fetching EC2 instances from AWS..."
 
-# Default filter gets all running instances
+# Always use the OS filter to find instances.
 aws_filter="Name=instance-state-name,Values=running"
+os_choice="${TARGET_OS_FILTER:-"All"}"
 
-# Add an OS-specific filter based on the parameter from Jenkins, if not 'All'
-# This works by filtering on the 'Name' tag of the instance.
-os_choice="${TARGET_OS_FILTER:-"All"}" # Default to "All" if variable isn't set
 if [[ "$os_choice" != "All" ]]; then
-    os_tag_value="*${os_choice,,}*" # Convert to lowercase and add wildcards (e.g., *ubuntu*)
-    
-    # For Amazon Linux, the tag might be 'amazon-linux-server' or similar
+    os_tag_value="*${os_choice,,}*" # Convert to lowercase and add wildcards
     if [[ "$os_choice" == "AmazonLinux" ]]; then
         os_tag_value="*amazon*linux*"
     fi
-    
     aws_filter="$aws_filter Name=tag:Name,Values=$os_tag_value"
     echo "[INFO] Filtering for OS type: $os_choice"
+else
+    echo "[INFO] Scanning all running instances."
 fi
 
-if [[ "${SCAN_ALL_INSTANCES:-false}" == "true" ]]; then
-    # Get instances based on the constructed filter
-    readarray -t INSTANCES < <(aws ec2 describe-instances \
-      --filters $aws_filter \
-      --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \
-      --output text)
-else
-    # Get only user-specified instances (this logic remains the same)
-    instance_ids_for_cli=$(echo "$INSTANCE_IDS" | tr ',' ' ')
-    readarray -t INSTANCES < <(aws ec2 describe-instances \
-      --instance-ids $instance_ids_for_cli \
-      --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \
-      --output text)
-fi
+readarray -t INSTANCES < <(aws ec2 describe-instances \
+  --filters $aws_filter \
+  --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \
+  --output text)
 
 if [[ ${#INSTANCES[@]} -eq 0 || -z "${INSTANCES[0]}" ]]; then
     echo "[ERROR] No matching and running instances with public DNS found!"
@@ -59,7 +46,7 @@ fi
 
 echo "[INFO] Found ${#INSTANCES[@]} candidate instances."
 
-# ========== SCAN FUNCTION ==========
+# ========== SCAN FUNCTION (remains the same) ==========
 run_scan() {
     local instance_id="$1"
     local instance_dns="$2"
@@ -67,7 +54,6 @@ run_scan() {
     local ssh_user
     local tailoring_file
 
-    # --- INTELLIGENT SSH USER AND TAILORING FILE SELECTION ---
     name_lower=$(echo "$name" | tr '[:upper:]' '[:lower:]')
     if [[ "$name_lower" == *"ubuntu"* ]]; then
         ssh_user="ubuntu"
@@ -85,7 +71,6 @@ run_scan() {
 
     echo "[INFO] Starting scan for '$name' ($instance_dns) as '$ssh_user'"
 
-    # --- DYNAMIC CONTENT FILE DISCOVERY ---
     local content_file_path
     echo "[INFO] Finding SCAP content file on remote host..."
     if [[ "$ssh_user" == "ubuntu" ]]; then
@@ -100,7 +85,6 @@ run_scan() {
     fi
     echo "[INFO] Found content file on remote: $content_file_path"
 
-    # --- RUN SCAN ---
     scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
         "$TAILORING_FILE_DIR/$tailoring_file" "$ssh_user@$instance_dns:/tmp/tailoring.xml"
 
@@ -114,19 +98,23 @@ run_scan() {
     echo "[OK] Report for '$name' copied to '$REPORT_DEST/report_${name}.html'"
 }
 
-# ========== MAIN LOOP ==========
+# ========== MAIN LOOP (UPDATED) ==========
 for entry in "${INSTANCES[@]}"; do
     read -r instance_id instance_dns name <<<"$entry"
 
-    # Skip excluded IPs
-    for ip in "${EXCLUDED_ARRAY[@]}"; do
-        if [[ "$instance_dns" == "$ip" ]]; then
-            echo "[INFO] Skipping excluded instance $instance_dns"
-            continue 2 # Skips to the next instance
+    # UPDATED: Skip excluded INSTANCE IDs
+    is_excluded=false
+    for excluded_id in "${EXCLUDED_ID_ARRAY[@]}"; do
+        if [[ "$instance_id" == "$excluded_id" ]]; then
+            echo "[INFO] Skipping excluded instance ID: $instance_id"
+            is_excluded=true
+            break
         fi
     done
+    if [[ "$is_excluded" == true ]]; then
+        continue
+    fi
     
-    # Run the scan for the instance with error handling
     run_scan "$instance_id" "$instance_dns" "$name" || echo "[ERROR] Scan failed for '$name' ($instance_dns). Continuing..."
 done
 

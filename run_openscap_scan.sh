@@ -18,7 +18,7 @@ IFS=',' read -r -a EXCLUDED_ARRAY <<< "${EXCLUDED_IPS:-""}"
 
 # ========== INSTANCE DISCOVERY ==========
 echo "[INFO] Fetching EC2 instances from AWS..."
-if [[ "$SCAN_ALL_INSTANCES" == "true" ]]; then
+if [[ "${SCAN_ALL_INSTANCES:-false}" == "true" ]]; then
     # Get all running instances in the region
     readarray -t INSTANCES < <(aws ec2 describe-instances \
       --filters "Name=instance-state-name,Values=running" \
@@ -40,7 +40,7 @@ fi
 
 echo "[INFO] Found ${#INSTANCES[@]} candidate instances."
 
-# ========== SCAN FUNCTION (IMPROVED LOGIC) ==========
+# ========== SCAN FUNCTION ==========
 run_scan() {
     local instance_id="$1"
     local instance_dns="$2"
@@ -49,7 +49,6 @@ run_scan() {
     local tailoring_file
 
     # --- INTELLIGENT SSH USER AND TAILORING FILE SELECTION ---
-    # Use the instance name tag to reliably determine the OS type.
     name_lower=$(echo "$name" | tr '[:upper:]' '[:lower:]')
     if [[ "$name_lower" == *"ubuntu"* ]]; then
         ssh_user="ubuntu"
@@ -58,7 +57,7 @@ run_scan() {
         ssh_user="centos"
         tailoring_file="centos-tailoring.xml"
     elif [[ "$name_lower" == *"rhel"* ]]; then
-        ssh_user="ec2-user" # Or 'cloud-user' depending on RHEL AMI
+        ssh_user="ec2-user"
         tailoring_file="rhel-tailoring.xml"
     else # Default to Amazon Linux
         ssh_user="ec2-user"
@@ -69,16 +68,10 @@ run_scan() {
 
     # --- DYNAMIC CONTENT FILE DISCOVERY ---
     local content_file_path
-    echo "[INFO] Installing tools and finding SCAP content file on remote host..."
+    echo "[INFO] Finding SCAP content file on remote host..."
     if [[ "$ssh_user" == "ubuntu" ]]; then
-        # FIXED: Enable 'universe' repo, update, and install correct packages for Ubuntu
-        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=20 "$ssh_user@$instance_dns" \
-            "sudo apt-get install -y software-properties-common && sudo add-apt-repository universe -y && sudo apt-get update -y && sudo apt-get install -y openscap-utils ssg-utils"
         content_file_path=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ssh_user@$instance_dns" "sudo find /usr/share/xml/scap/ssg/content/ -name '*ssg-ubuntu*ds.xml' | head -n 1")
     else # For Amazon Linux, CentOS, RHEL
-        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=20 "$ssh_user@$instance_dns" \
-            "sudo yum install -y openscap-scanner scap-security-guide"
-        # FIXED: Added '*ssg-al2023*' pattern to find the file on Amazon Linux 2023
         content_file_path=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ssh_user@$instance_dns" "sudo find /usr/share/xml/scap/ssg/content/ -name '*ssg-al2023*ds.xml' -o -name '*ssg-amzn*ds.xml' -o -name '*ssg-rhel*ds.xml' -o -name '*ssg-centos*ds.xml' | head -n 1")
     fi
 

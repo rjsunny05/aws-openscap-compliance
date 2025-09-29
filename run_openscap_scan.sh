@@ -15,36 +15,33 @@ mkdir -p "$REPORT_DEST"
 
 IFS=',' read -r -a EXCLUDED_ID_ARRAY <<< "${EXCLUDED_INSTANCE_IDS:-""}"
 
-# ========== INSTANCE DISCOVERY (MODIFIED) ==========
+# ========== INSTANCE DISCOVERY ==========
 echo "[INFO] Fetching EC2 instances from AWS..."
 
-aws_filter="Name=instance-state-name,Values=running"
+# Use a bash array to store filters for robust argument passing.
+aws_filter_array=("Name=instance-state-name,Values=running")
 os_choice="${TARGET_OS_FILTER:-"All"}"
 
 # Use a case statement to select the best filter for the chosen OS.
-# UPDATED: Added case-insensitivity for Jenkins parameters (e.g., Rhel | RHEL)
 case "$os_choice" in
     Rhel | RHEL)
         # For RHEL, we use the most reliable 'platform' filter.
-        aws_filter="$aws_filter Name=platform,Values=redhat"
+        aws_filter_array+=("Name=platform,Values=redhat")
         echo "[INFO] Filtering for OS type: RHEL (using platform details)"
         ;;
     Ubuntu | ubuntu)
         # The 'platform' filter isn't available for Ubuntu. We fall back to the Name tag.
-        # Ensure your Ubuntu instances have "ubuntu" in their Name tag.
-        aws_filter="$aws_filter Name=tag:Name,Values=*ubuntu*"
+        aws_filter_array+=("Name=tag:Name,Values=*ubuntu*")
         echo "[INFO] Filtering for OS type: Ubuntu (using Name tag)"
         ;;
     Centos | centos)
         # The 'platform' filter isn't available for CentOS. We fall back to the Name tag.
-        # Ensure your CentOS instances have "centos" in their Name tag.
-        aws_filter="$aws_filter Name=tag:Name,Values=*centos*"
+        aws_filter_array+=("Name=tag:Name,Values=*centos*")
         echo "[INFO] Filtering for OS type: CentOS (using Name tag)"
         ;;
     AmazonLinux | amazonlinux)
         # The 'platform' filter isn't available for Amazon Linux. We fall back to the Name tag.
-        # Ensure your instances have "amazonlinux" or "amzn" in their Name tag.
-        aws_filter="$aws_filter Name=tag:Name,Values=*amazon*linux*,*amzn*"
+        aws_filter_array+=("Name=tag:Name,Values=*amazon*linux*,*amzn*")
         echo "[INFO] Filtering for OS type: Amazon Linux (using Name tag)"
         ;;
     All)
@@ -56,8 +53,10 @@ case "$os_choice" in
         ;;
 esac
 
+# Pass the filter array to the AWS CLI command.
+# This ensures each filter is passed as a separate, correctly quoted argument.
 readarray -t INSTANCES < <(aws ec2 describe-instances \
-  --filters "$aws_filter" \
+  --filters "${aws_filter_array[@]}" \
   --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \
   --output text)
 
@@ -68,7 +67,7 @@ fi
 
 echo "[INFO] Found ${#INSTANCES[@]} candidate instances."
 
-# ========== SCAN FUNCTION (remains the same) ==========
+# ========== SCAN FUNCTION ==========
 run_scan() {
     local instance_id="$1"
     local instance_dns="$2"
@@ -120,7 +119,7 @@ run_scan() {
     echo "[OK] Report for '$name' copied to '$REPORT_DEST/report_${name}.html'"
 }
 
-# ========== MAIN LOOP (remains the same) ==========
+# ========== MAIN LOOP ==========
 for entry in "${INSTANCES[@]}"; do
     read -r instance_id instance_dns name <<<"$entry"
 

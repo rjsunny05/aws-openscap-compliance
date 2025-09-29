@@ -13,29 +13,50 @@ TAILORING_FILE_DIR="$WORKSPACE/tailoring"
 REPORT_DEST="$WORKSPACE/openscap_reports"
 mkdir -p "$REPORT_DEST"
 
-# UPDATED: Convert excluded INSTANCE IDs to an array
 IFS=',' read -r -a EXCLUDED_ID_ARRAY <<< "${EXCLUDED_INSTANCE_IDS:-""}"
 
-# ========== INSTANCE DISCOVERY (SIMPLIFIED) ==========
+# ========== INSTANCE DISCOVERY (MODIFIED) ==========
 echo "[INFO] Fetching EC2 instances from AWS..."
 
-# Always use the OS filter to find instances.
 aws_filter="Name=instance-state-name,Values=running"
 os_choice="${TARGET_OS_FILTER:-"All"}"
 
-if [[ "$os_choice" != "All" ]]; then
-    os_tag_value="*${os_choice,,}*" # Convert to lowercase and add wildcards
-    if [[ "$os_choice" == "AmazonLinux" ]]; then
-        os_tag_value="*amazon*linux*"
-    fi
-    aws_filter="$aws_filter Name=tag:Name,Values=$os_tag_value"
-    echo "[INFO] Filtering for OS type: $os_choice"
-else
-    echo "[INFO] Scanning all running instances."
-fi
+# Use a case statement to select the best filter for the chosen OS.
+case "$os_choice" in
+    Rhel)
+        # For RHEL, we use the most reliable 'platform' filter.
+        aws_filter="$aws_filter Name=platform,Values=redhat"
+        echo "[INFO] Filtering for OS type: RHEL (using platform details)"
+        ;;
+    Ubuntu)
+        # The 'platform' filter isn't available for Ubuntu. We fall back to the Name tag.
+        # Ensure your Ubuntu instances have "ubuntu" in their Name tag.
+        aws_filter="$aws_filter Name=tag:Name,Values=*ubuntu*"
+        echo "[INFO] Filtering for OS type: Ubuntu (using Name tag)"
+        ;;
+    Centos)
+        # The 'platform' filter isn't available for CentOS. We fall back to the Name tag.
+        # Ensure your CentOS instances have "centos" in their Name tag.
+        aws_filter="$aws_filter Name=tag:Name,Values=*centos*"
+        echo "[INFO] Filtering for OS type: CentOS (using Name tag)"
+        ;;
+    AmazonLinux)
+        # The 'platform' filter isn't available for Amazon Linux. We fall back to the Name tag.
+        # Ensure your instances have "amazonlinux" or "amzn" in their Name tag.
+        aws_filter="$aws_filter Name=tag:Name,Values=*amazon*linux*,*amzn*"
+        echo "[INFO] Filtering for OS type: Amazon Linux (using Name tag)"
+        ;;
+    All)
+        echo "[INFO] Scanning all running instances."
+        ;;
+    *)
+        echo "[ERROR] Unknown OS choice from Jenkins parameter: $os_choice"
+        exit 1
+        ;;
+esac
 
 readarray -t INSTANCES < <(aws ec2 describe-instances \
-  --filters $aws_filter \
+  --filters "$aws_filter" \
   --query 'Reservations[].Instances[?PublicDnsName != ``].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value]' \
   --output text)
 
@@ -98,11 +119,10 @@ run_scan() {
     echo "[OK] Report for '$name' copied to '$REPORT_DEST/report_${name}.html'"
 }
 
-# ========== MAIN LOOP (UPDATED) ==========
+# ========== MAIN LOOP (remains the same) ==========
 for entry in "${INSTANCES[@]}"; do
     read -r instance_id instance_dns name <<<"$entry"
 
-    # UPDATED: Skip excluded INSTANCE IDs
     is_excluded=false
     for excluded_id in "${EXCLUDED_ID_ARRAY[@]}"; do
         if [[ "$instance_id" == "$excluded_id" ]]; then

@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Tailoring xmlns="http://www.ssgproject.org/schemas/0.1/tailoring-2.0" id="cis-benchmark-tailoring-for-al2">
-  <benchmark href="/usr/share/xml/scap/ssg/content/ssg-amazonlinux2-ds.xml"/>
-  <version time="2025-09-29T12:07:07">1</version>
-  <Profile id="xccdf_org.ssgproject.content_profile_cis" extends="xccdf_org.ssgproject.content_profile_cis">
+<Tailoring xmlns="http://csrc.nist.gov/ns/oscal/1.0" id="ssg-al2023-cis-tailoring">
+  <extends resource="/usr/share/xml/scap/ssg/content/ssg-al2023-ds.xml"/>
+  <profile id="xccdf_org.ssgproject.content_profile_cis">
     <title>CIS Benchmark with Customizations for Amazon Linux</title>
     <select idref="xccdf_org.ssgproject.content_rule_partition_for_home_separate" selected="false"/>
-  </Profile>
+  </profile>
 </Tailoring>

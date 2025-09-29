@@ -73,7 +73,7 @@ run_scan() {
     if [[ "$ssh_user" == "ubuntu" ]]; then
         # FIXED: Enable 'universe' repo, update, and install correct packages for Ubuntu
         ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=20 "$ssh_user@$instance_dns" \
-            "sudo add-apt-repository universe -y && sudo apt-get update -y && sudo apt-get install -y openscap-utils ssg-utils"
+            "sudo apt-get install -y software-properties-common && sudo add-apt-repository universe -y && sudo apt-get update -y && sudo apt-get install -y openscap-utils ssg-utils"
         content_file_path=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ssh_user@$instance_dns" "sudo find /usr/share/xml/scap/ssg/content/ -name '*ssg-ubuntu*ds.xml' | head -n 1")
     else # For Amazon Linux, CentOS, RHEL
         ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=20 "$ssh_user@$instance_dns" \

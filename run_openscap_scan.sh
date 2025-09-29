@@ -5,7 +5,7 @@ set -x
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-SSM_FILE="/home/khushi.m/ssm.txt"
+SSM_FILE="${SCRIPT_DIR}/ssm.txt"
 echo "[INFO] Fetching instance metadata..."
 
 # Header
@@ -327,7 +327,7 @@ done
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="/home/khushi.m/openscap_reports"
 FOLDER_NAME="customAmazon2023"
-SSM_FILE="/home/khushi.m/ssm.txt"
+SSM_FILE="${SCRIPT_DIR}/ssm.txt"
 
 echo ""
 echo "[INFO] Starting OpenSCAP for Amazon Linux 2023 instances..."

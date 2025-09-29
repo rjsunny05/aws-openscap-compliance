@@ -41,6 +41,8 @@ done < <(aws ssm describe-instance-information \
 
 echo "[DONE] Output saved to $SSM_FILE"
 
+cat "$SSM_FILE"
+
 echo ""
 echo "[INFO] Instance Summary by Specific Platform Conditions:"
 echo ""

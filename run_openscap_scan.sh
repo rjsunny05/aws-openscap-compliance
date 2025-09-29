@@ -22,25 +22,26 @@ aws_filter="Name=instance-state-name,Values=running"
 os_choice="${TARGET_OS_FILTER:-"All"}"
 
 # Use a case statement to select the best filter for the chosen OS.
+# UPDATED: Added case-insensitivity for Jenkins parameters (e.g., Rhel | RHEL)
 case "$os_choice" in
-    Rhel)
+    Rhel | RHEL)
         # For RHEL, we use the most reliable 'platform' filter.
         aws_filter="$aws_filter Name=platform,Values=redhat"
         echo "[INFO] Filtering for OS type: RHEL (using platform details)"
         ;;
-    Ubuntu)
+    Ubuntu | ubuntu)
         # The 'platform' filter isn't available for Ubuntu. We fall back to the Name tag.
         # Ensure your Ubuntu instances have "ubuntu" in their Name tag.
         aws_filter="$aws_filter Name=tag:Name,Values=*ubuntu*"
         echo "[INFO] Filtering for OS type: Ubuntu (using Name tag)"
         ;;
-    Centos)
+    Centos | centos)
         # The 'platform' filter isn't available for CentOS. We fall back to the Name tag.
         # Ensure your CentOS instances have "centos" in their Name tag.
         aws_filter="$aws_filter Name=tag:Name,Values=*centos*"
         echo "[INFO] Filtering for OS type: CentOS (using Name tag)"
         ;;
-    AmazonLinux)
+    AmazonLinux | amazonlinux)
         # The 'platform' filter isn't available for Amazon Linux. We fall back to the Name tag.
         # Ensure your instances have "amazonlinux" or "amzn" in their Name tag.
         aws_filter="$aws_filter Name=tag:Name,Values=*amazon*linux*,*amzn*"

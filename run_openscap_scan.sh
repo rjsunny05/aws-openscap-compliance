@@ -3,115 +3,126 @@ set -euo pipefail
 set -x
 
 # ========== PARAMETERS ==========
-WORKSPACE="$1"          # Jenkins workspace (passed from Jenkinsfile)
-REPORT_DEST="$WORKSPACE/openscap_reports"
+WORKSPACE="$1"          # Jenkins workspace
 SSH_KEY="$2"            # Private key file path (Jenkins SSH credential)
-PROFILE="$3"            # OpenSCAP profile to use, e.g., xccdf_org.ssgproject.content_profile_cis
+PROFILE="$3"            # OpenSCAP profile (e.g. xccdf_org.ssgproject.content_profile_cis)
 TAILORING_FILE_DIR="$4" # Directory in workspace containing tailoring XMLs
-CONTENT_FILE_DIR="$5"   # Directory in workspace containing profile XMLs
+TARGET_OS="$5"          # OS filter from Jenkins param (AmazonLinux2, Ubuntu22.04, CentOS7.9)
+SCAN_ALL_INSTANCES="$6" # true/false
+INSTANCE_IDS="$7"       # Comma-separated instance IDs (only if SCAN_ALL_INSTANCES=false)
+EXCLUDED_IPS="$8"       # Comma-separated list of IPs to exclude
 
+REPORT_DEST="$WORKSPACE/openscap_reports"
 mkdir -p "$REPORT_DEST"
 
-echo "[INFO] Fetching public DNS of running Linux instances..."
+# Convert excluded IPs to array
+IFS=',' read -r -a EXCLUDED_ARRAY <<< "$EXCLUDED_IPS"
 
-# Fetch public DNS + Name tag + Platform (platform is empty for Linux)
-readarray -t INSTANCES < <(aws ec2 describe-instances \
-  --filters "Name=instance-state-name,Values=running" \
-  --query 'Reservations[].Instances[].[PublicDnsName,Tags[?Key==`Name`]|[0].Value,Platform]' \
-  --output text)
+echo "[INFO] Fetching EC2 instances from AWS..."
+
+if [[ "$SCAN_ALL_INSTANCES" == "true" ]]; then
+    # All running instances in region
+    readarray -t INSTANCES < <(aws ec2 describe-instances \
+      --filters "Name=instance-state-name,Values=running" \
+      --query 'Reservations[].Instances[].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value,Platform]' \
+      --output text)
+else
+    # Only user-specified instances
+    IFS=',' read -r -a IDS <<< "$INSTANCE_IDS"
+    INSTANCES=()
+    for id in "${IDS[@]}"; do
+        info=$(aws ec2 describe-instances \
+          --instance-ids "$id" \
+          --query 'Reservations[].Instances[].[InstanceId,PublicDnsName,Tags[?Key==`Name`]|[0].Value,Platform]' \
+          --output text)
+        INSTANCES+=("$info")
+    done
+fi
 
 if [[ ${#INSTANCES[@]} -eq 0 ]]; then
-    echo "[ERROR] No running instances found!"
+    echo "[ERROR] No matching instances found!"
     exit 1
 fi
 
-echo "[INFO] Found ${#INSTANCES[@]} instances:"
+echo "[INFO] Found ${#INSTANCES[@]} candidate instances"
 printf '%s\n' "${INSTANCES[@]}"
 
 # ========== SCAN FUNCTION ==========
 run_scan() {
-    local instance_dns="$1"
-    local platform="$2"
+    local instance_id="$1"
+    local instance_dns="$2"
     local name="$3"
-    local profile="$4"
-    local tailoring_file="$5"
+    local platform="$4"
 
-    # Default SSH user → adjust per platform
+    # Default SSH user
     local ssh_user="ec2-user"
     [[ "$platform" =~ Ubuntu ]] && ssh_user="ubuntu"
     [[ "$platform" =~ CentOS ]] && ssh_user="centos"
 
-    echo "[INFO] Starting scan for $name ($instance_dns) as $ssh_user"
+    echo "[INFO] Starting scan for $name ($instance_dns, $platform) as $ssh_user"
 
-    # Copy content and tailoring files
-    scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-        "$CONTENT_FILE_DIR/$profile.xml" "$ssh_user@$instance_dns:/tmp/"
+    # -------- INSTALL OPENSCAP + CONTENT --------
+    if [[ "$platform" =~ Ubuntu ]]; then
+        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ssh_user@$instance_dns" \
+            "sudo apt-get update -y && sudo apt-get install -y openscap-utils ssg-base"
+        CONTENT_FILE="/usr/share/xml/scap/ssg/content/ssg-ubuntu2204-ds.xml"
+    elif [[ "$platform" =~ CentOS ]]; then
+        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ssh_user@$instance_dns" \
+            "sudo yum install -y openscap-scanner scap-security-guide"
+        CONTENT_FILE="/usr/share/xml/scap/ssg/content/ssg-centos7-ds.xml"
+    else
+        ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$ssh_user@$instance_dns" \
+            "sudo yum install -y openscap-scanner scap-security-guide"
+        CONTENT_FILE="/usr/share/xml/scap/ssg/content/ssg-amazonlinux2-ds.xml"
+    fi
+
+    # Pick tailoring file
+    local tailoring_file
+    case "$platform" in
+        Amazon*|AmazonLinux*) tailoring_file="amazonlinux-tailoring.xml" ;;
+        Ubuntu*) tailoring_file="ubuntu-tailoring.xml" ;;
+        CentOS*) tailoring_file="centos-tailoring.xml" ;;
+        *) echo "[WARN] Unknown platform $platform for $instance_dns, skipping..." ; return ;;
+    esac
+
+    # Copy tailoring file
     scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
         "$TAILORING_FILE_DIR/$tailoring_file" "$ssh_user@$instance_dns:/tmp/"
 
-    # -------- PRECHECK SCAN --------
-    echo "[INFO] Running precheck scan on $instance_dns..."
-    SCAN_OUTPUT=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-        "$ssh_user@$instance_dns" \
-        "oscap xccdf eval --profile $profile --tailoring-file /tmp/$tailoring_file /tmp/$profile.xml 2>&1 || true")
-
-    # -------- PATCH FAILED RULES --------
-    FAIL_RULES=$(echo "$SCAN_OUTPUT" | awk '/Result: (fail|notchecked|notapplicable)/ {print $2}')
-    if [[ -n "$FAIL_RULES" ]]; then
-        echo "[INFO] Patching tailoring XML on $instance_dns for rules: $FAIL_RULES"
-        for rule in $FAIL_RULES; do
-            ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-              "$ssh_user@$instance_dns" \
-              "sudo sed -i \"s|<rule id='$rule' selected='true'/>|<rule id='$rule' selected='false'/>|g\" /tmp/$tailoring_file"
-        done
-    fi
-
-    # -------- FINAL SCAN --------
-    echo "[INFO] Running final scan on $instance_dns..."
+    # Run scan
     ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
         "$ssh_user@$instance_dns" \
-        "oscap xccdf eval --profile $profile --tailoring-file /tmp/$tailoring_file --report /tmp/report_${name}.html /tmp/$profile.xml"
+        "oscap xccdf eval --profile $PROFILE --tailoring-file /tmp/$tailoring_file --report /tmp/report_${name}.html $CONTENT_FILE"
 
-    # -------- COPY REPORT --------
+    # Copy back report
     scp -i "$SSH_KEY" -o StrictHostKeyChecking=no \
         "$ssh_user@$instance_dns:/tmp/report_${name}.html" "$REPORT_DEST/"
-
-    # -------- CLEANUP --------
-    ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no \
-        "$ssh_user@$instance_dns" \
-        "rm -f /tmp/report_${name}.html /tmp/$profile.xml /tmp/$tailoring_file"
 
     echo "[OK] Report generated: $REPORT_DEST/report_${name}.html"
 }
 
 # ========== MAIN LOOP ==========
-for instance_info in "${INSTANCES[@]}"; do
-    # Unpack: PublicDNS NameTag Platform
-    read -r instance_dns name platform <<<"$instance_info"
+for entry in "${INSTANCES[@]}"; do
+    read -r instance_id instance_dns name platform <<<"$entry"
 
-    # Handle missing platform (Linux = empty)
+    # Normalize platform
     if [[ -z "$platform" || "$platform" == "None" || "$platform" == "null" ]]; then
         platform="AmazonLinux"
     fi
 
-    # Pick tailoring file
-    case "$platform" in
-        Amazon*|AmazonLinux*)
-            TAILORING_FILE="amazonlinux-tailoring.xml"
-            ;;
-        Ubuntu*)
-            TAILORING_FILE="ubuntu-tailoring.xml"
-            ;;
-        CentOS*)
-            TAILORING_FILE="centos-tailoring.xml"
-            ;;
-        *)
-            echo "[WARN] Unknown platform $platform for $instance_dns, skipping..."
-            continue
-            ;;
+    # Match target OS filter
+    case "$TARGET_OS" in
+        AmazonLinux2) [[ "$platform" =~ AmazonLinux ]] || continue ;;
+        Ubuntu22.04)  [[ "$platform" =~ Ubuntu ]] || continue ;;
+        CentOS7.9)    [[ "$platform" =~ CentOS ]] || continue ;;
     esac
 
-    run_scan "$instance_dns" "$platform" "$name" "$PROFILE" "$TAILORING_FILE"
+    # Skip excluded IPs
+    for ip in "${EXCLUDED_ARRAY[@]}"; do
+        [[ "$instance_dns" == "$ip" ]] && echo "[INFO] Skipping excluded $instance_dns" && continue 2
+    done
+
+    run_scan "$instance_id" "$instance_dns" "$name" "$platform"
 done
 
 echo "[INFO] All scans completed. Reports saved at: $REPORT_DEST"

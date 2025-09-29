@@ -62,7 +62,7 @@ for label in "${!platform_filters[@]}"; do
       gsub(/"/, "", $0);
       print $1 "," $2 "," $3 "," $4
     }
-  ' /home/khushi.m/ssm.txt
+  ' "$SSM_FILE"
   echo ""
 done
 
@@ -73,7 +73,7 @@ FOLDER_NAME="customCentos7_6_1810"
 echo ""
 echo "[INFO] Starting OpenSCAP for CentOS Linux 7.6.1810 instances..."
 
-tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
@@ -158,7 +158,7 @@ FOLDER_NAME="customCentos7_9_2009"
 echo ""
 echo "[INFO] Starting OpenSCAP for CentOS Linux 7.9.2009 instances..."
 
-tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
@@ -244,7 +244,7 @@ FOLDER_NAME="customAmazon2"
 echo ""
 echo "[INFO] Processing Amazon Linux 2 instances..."
 
-tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
@@ -435,7 +435,7 @@ FOLDER_NAME="customUbuntu22.04"
 echo ""
 echo "[INFO] Starting OpenSCAP for Ubuntu 22.04 instances..."
 
-tail -n +2 /home/khushi.m/ssm.txt | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 

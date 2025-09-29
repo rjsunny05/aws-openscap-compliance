@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<ns0:Tailoring xmlns:ns0="http://checklists.nist.gov/xccdf/1.2" id="xccdf_ubuntu2404_tailoring_true_only">
+  <ns0:benchmark href="ssg-ubuntu2404-ds.xml"/>
+  <ns0:status>draft</ns0:status>
+  <ns0:version time="2025-08-01T11:36:19.594920">1.0</ns0:version>
+  <ns0:Profile id="xccdf_ubuntu2404_profile_true_only" extends="xccdf_org.ssgproject.content_profile_standard">
+    <ns0:title xml:lang="en-US" override="true">Custom Ubuntu 24.04 Profile with Only True Rules</ns0:title>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_package_prelink_removed" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_partition_for_dev_shm" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_package_sudo_installed" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_sudo_add_use_pty" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_sudo_remove_no_authenticate" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_banner_etc_issue_cis" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_banner_etc_issue_net_cis" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_banner_etc_motd_cis" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_issue" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_issue_net" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_motd" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_issue" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_issue_net" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_motd" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_issue" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_issue_net" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_motd" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_package_pam_modules_installed" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_package_pam_runtime_installed" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_password_pam_unix_enabled" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_password_pam_unix_authtok" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_set_password_hashing_algorithm_logindefs" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_set_password_hashing_algorithm_systemauth" selected="false"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_account_unique_id" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_group_unique_id" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_group_unique_name" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_account_unique_name" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_ensure_shadow_group_empty" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_password_warn_age_login_defs" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_set_post_pw_existing" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_password_all_shadowed" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_password_last_change_is_in_past" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_password_pam_unix_no_remember" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_gid_passwd_group_same" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_no_empty_passwords_etc_shadow" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_no_forward_files" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_no_netrc_files" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_no_uid_except_zero" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_accounts_root_gid_zero" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_ensure_root_access_controlled" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_groups_no_zero_gid_except_root" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_no_invalid_shell_accounts_unlocked" selected="true"/>
+    <ns0:select idref="xccdf_org.ssgproject.content_rule_no_shelllogin_for_systemaccounts" selected="true"/>
+  </ns0:Profile>
+</ns0:Tailoring>

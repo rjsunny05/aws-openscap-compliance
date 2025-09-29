@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xccdf:Tailoring xmlns:xccdf="http://checklists.nist.gov/xccdf/1.2"
+                 id="xccdf_org.ssgproject.content_tailoring_ubuntu2204_pass_only">
+  <xccdf:benchmark href="ssg-ubuntu2204-ds.xml"/>
+  <xccdf:version time="2025-07-02T00:00:00">1</xccdf:version>
+  <xccdf:Profile id="xccdf_org.ssgproject.content_profile_standard_customized"
+                 extends="xccdf_org.ssgproject.content_profile_standard">
+    <xccdf:title>Standard System Security Profile for Ubuntu 22.04 [CUSTOMIZED]</xccdf:title>
+    <xccdf:description>This profile includes only passed rules from the previous scan.</xccdf:description>
+
+    <!-- Included Passed Rules -->
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_audit_installed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_service_auditd_enabled" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_rsyslog_installed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_service_rsyslog_enabled" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_rsyslog_files_groupownership" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_rsyslog_files_permissions" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_ensure_logrotate_activated" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_permissions_systemmap" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sysctl_fs_protected_hardlinks" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sysctl_fs_protected_symlinks" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_group" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_gshadow" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_passwd" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_groupowner_etc_shadow" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_group" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_gshadow" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_passwd" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_owner_etc_shadow" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_group" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_gshadow" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_passwd" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_file_permissions_etc_shadow" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sysctl_fs_suid_dumpable" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sysctl_kernel_randomize_va_space" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_service_apport_disabled" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_cron_installed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_service_cron_enabled" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_inetutils-telnetd_removed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_nis_removed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_ntpdate_removed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_telnetd-ssl_removed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_telnetd_removed" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sshd_set_keepalive" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sshd_set_idle_timeout" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sshd_disable_empty_passwords" selected="true"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_sshd_disable_root_login" selected="true"/>
+
+    <!-- Disabled Failed Rules -->
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_partition_for_home" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_partition_for_tmp" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_partition_for_var" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_partition_for_var_log" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_partition_for_var_log_audit" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_rsyslog_files_ownership" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_package_timesyncd_installed" selected="false"/>
+    <xccdf:select idref="xccdf_org.ssgproject.content_rule_service_timesyncd_enabled" selected="false"/>
+  </xccdf:Profile>
+</xccdf:Tailoring>

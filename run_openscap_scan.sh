@@ -95,7 +95,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
         fi
         # --- END OF LOGIC BLOCK ---
 
-        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
@@ -191,7 +191,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
         fi
         # --- END OF LOGIC BLOCK ---
 
-        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
@@ -290,7 +290,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
         # --- END OF LOGIC BLOCK ---
 
         # SSH Test
-        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying $FOLDER_NAME to $ip:/tmp/ ..."
@@ -502,7 +502,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
         fi
         # --- END OF LOGIC BLOCK ---
 
-        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."

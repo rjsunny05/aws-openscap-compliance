@@ -81,7 +81,19 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
 
     if [[ "$platform" == "CentOS Linux" && "$version" == "7.6.1810" ]]; then
         echo "[TRY] $name ($ip) - CentOS Linux 7.6.1810"
-        SSH_USER="centos"
+        
+         # --- ADD THE NEW LOGIC BLOCK HERE ---
+        if [[ "$platform" == "Ubuntu" ]]; then
+            SSH_USER="ubuntu"
+        elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
+            SSH_USER="ec2-user"
+        elif [[ "$platform" == "CentOS Linux" ]]; then
+            SSH_USER="centos"
+        else
+            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+            continue
+        fi
+        # --- END OF LOGIC BLOCK ---
 
         if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
@@ -166,7 +178,18 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
 
     if [[ "$platform" == "CentOS Linux" && "$version" == "7.9.2009" ]]; then
         echo "[TRY] $name ($ip) - CentOS Linux 7.9.2009"
-        SSH_USER="centos"
+         # --- ADD THE NEW LOGIC BLOCK HERE ---
+        if [[ "$platform" == "Ubuntu" ]]; then
+            SSH_USER="ubuntu"
+        elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
+            SSH_USER="ec2-user"
+        elif [[ "$platform" == "CentOS Linux" ]]; then
+            SSH_USER="centos"
+        else
+            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+            continue
+        fi
+        # --- END OF LOGIC BLOCK ---
 
         if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
@@ -252,7 +275,19 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
 
     if [[ "$platform" == "Amazon Linux" && "$version" == "2" ]]; then
         echo "[TRY] $name ($ip) - Amazon Linux 2"
-        SSH_USER="ec2-user"
+        
+         # --- ADD THE NEW LOGIC BLOCK HERE ---
+        if [[ "$platform" == "Ubuntu" ]]; then
+            SSH_USER="ubuntu"
+        elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
+            SSH_USER="ec2-user"
+        elif [[ "$platform" == "CentOS Linux" ]]; then
+            SSH_USER="centos"
+        else
+            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+            continue
+        fi
+        # --- END OF LOGIC BLOCK ---
 
         # SSH Test
         if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
@@ -341,7 +376,18 @@ tail -n +2 "$SSM_FILE" | while IFS=, read -r name ip platform version; do
     if [[ "$platform" == "Amazon Linux" && "$version" == "2023" ]]; then
         echo "[TRY] $name ($ip) - Amazon Linux 2023"
 
-        SSH_USER="ec2-user"
+         # --- ADD THE NEW LOGIC BLOCK HERE ---
+        if [[ "$platform" == "Ubuntu" ]]; then
+            SSH_USER="ubuntu"
+        elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
+            SSH_USER="ec2-user"
+        elif [[ "$platform" == "CentOS Linux" ]]; then
+            SSH_USER="centos"
+        else
+            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+            continue
+        fi
+        # --- END OF LOGIC BLOCK ---
 
         # SSH connectivity check
         if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
@@ -443,7 +489,18 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
 
     if [[ "$platform" == "Ubuntu" && "$version" == "22.04" ]]; then
         echo "[TRY] $name ($ip) - Ubuntu 22.04"
-        SSH_USER="ubuntu"
+        
+        if [[ "$platform" == "Ubuntu" ]]; then
+            SSH_USER="ubuntu"
+        elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
+            SSH_USER="ec2-user"
+        elif [[ "$platform" == "CentOS Linux" ]]; then
+            SSH_USER="centos"
+        else
+            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+            continue
+        fi
+        # --- END OF LOGIC BLOCK ---
 
         if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful" 2>/dev/null; then
             echo "[OK] SSH successful to $ip as $SSH_USER"

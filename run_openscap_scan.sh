@@ -478,7 +478,7 @@ done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
-FOLDER_NAME="customUbuntu22.04"
+FOLDER_NAME="customUbuntu2204"
 
 echo ""
 echo "[INFO] Starting OpenSCAP for Ubuntu 22.04 instances..."

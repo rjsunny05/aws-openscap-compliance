@@ -1,17 +1,16 @@
 #!/bin/bash
-
-#set -euo pipefail
 set -x
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
 SSM_FILE="${SCRIPT_DIR}/ssm.txt"
-echo "[INFO] Fetching instance metadata..."
+FINAL_SSM_FILE="${SCRIPT_DIR}/ssm_final_scan_list.txt"
 
-# Header
+#
+# STEP 1: Always discover all online instances.
+#
+echo "[INFO] Performing full instance discovery..."
 echo "InstanceName,PrivateIP,PlatformName,PlatformVersion" > "$SSM_FILE"
 
-# Fetch EC2 Name and IP
 declare -A IP_NAME_MAP
 while IFS=$'\t' read -r instance_id name private_ip; do
     if [[ -n "$private_ip" && -n "$name" ]]; then
@@ -21,7 +20,6 @@ done < <(aws ec2 describe-instances \
     --query 'Reservations[].Instances[?State.Name==`running`].[InstanceId,Tags[?Key==`Name`]|[0].Value,PrivateIpAddress]' \
     --output text)
 
-# Fetch SSM info
 while IFS=$'\t' read -r instance_id platform_name platform_version private_ip; do
     name="${IP_NAME_MAP[$private_ip]:-unknown}"
     if [[ "$name" == "unknown" ]]; then
@@ -39,13 +37,66 @@ done < <(aws ssm describe-instance-information \
     --query 'InstanceInformationList[*].[InstanceId,PlatformName,PlatformVersion,IPAddress]' \
     --output text | grep -v 'Windows')
 
-echo "[DONE] Output saved to $SSM_FILE"
-
+echo "[INFO] Full instance list generated in ssm.txt:"
 cat "$SSM_FILE"
+echo "--------------------------------------------------"
 
-echo ""
-echo "[INFO] Instance Summary by Specific Platform Conditions:"
-echo ""
+#
+# STEP 2: Filter the discovered list based on Jenkins parameters.
+#
+HEADER=$(head -n 1 "$SSM_FILE")
+BODY=$(tail -n +2 "$SSM_FILE")
+
+# OS Filtering
+if [[ -n "$OS_TYPE" && "$OS_TYPE" != "All" ]]; then
+    echo "[FILTER] Filtering by OS: $OS_TYPE"
+    OS_FILTER=""
+    case "$OS_TYPE" in
+        "Centos") OS_FILTER="CentOS Linux" ;;
+        "RHEL") OS_FILTER="Red Hat Enterprise Linux" ;;
+        "Ubuntu") OS_FILTER="Ubuntu" ;;
+        "Amazon Linux") OS_FILTER="Amazon Linux" ;;
+    esac
+    BODY=$(echo "$BODY" | grep "$OS_FILTER" || true)
+fi
+
+# Version Filtering
+VERSION_FILTER=""
+if [[ "$OS_TYPE" == "Ubuntu" && -n "$UBUNTU_VERSION" && "$UBUNTU_VERSION" != "N/A" ]]; then
+    VERSION_FILTER=$UBUNTU_VERSION
+elif [[ "$OS_TYPE" == "Amazon Linux" && -n "$AMAZON_LINUX_VERSION" && "$AMAZON_LINUX_VERSION" != "N/A" ]]; then
+    VERSION_FILTER=$AMAZON_LINUX_VERSION
+fi
+
+if [[ -n "$VERSION_FILTER" ]]; then
+    echo "[FILTER] Filtering by Version: $VERSION_FILTER"
+    BODY=$(echo "$BODY" | grep ",\"$VERSION_FILTER\"" || true)
+fi
+
+# IP Exclusion Filtering
+if [[ -n "$EXCLUDE_IPS" ]]; then
+    echo "[FILTER] Excluding IPs:"
+    echo "$EXCLUDE_IPS"
+    BODY=$(echo "$BODY" | grep -v -F -f <(echo "$EXCLUDE_IPS") || true)
+fi
+
+#
+# STEP 3: Create the final list for scanning.
+#
+echo "$HEADER" > "$FINAL_SSM_FILE"
+if [[ -n "$BODY" ]]; then
+    echo "$BODY" >> "$FINAL_SSM_FILE"
+fi
+
+echo "[INFO] Final instance list for scanning is ready:"
+cat "$FINAL_SSM_FILE"
+echo "====================================================="
+
+
+#
+# STEP 4: Run scans using the FINAL list.
+# The rest of your script remains the same, but it now reads from FINAL_SSM_FILE
+#
 
 declare -A platform_filters=(
   ["Amazon Linux 2"]="Amazon Linux|2"
@@ -64,7 +115,7 @@ for label in "${!platform_filters[@]}"; do
       gsub(/"/, "", $0);
       print $1 "," $2 "," $3 "," $4
     }
-  ' "$SSM_FILE"
+  ' "$FINAL_SSM_FILE"
   echo ""
 done
 
@@ -76,14 +127,14 @@ FOLDER_NAME="customCentos7_6_1810"
 echo ""
 echo "[INFO] Starting OpenSCAP for CentOS Linux 7.6.1810 instances..."
 
-tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
     if [[ "$platform" == "CentOS Linux" && "$version" == "7.6.1810" ]]; then
         echo "[TRY] $name ($ip) - CentOS Linux 7.6.1810"
         
-         # --- ADD THE NEW LOGIC BLOCK HERE ---
+        # --- ADD THE NEW LOGIC BLOCK HERE ---
         if [[ "$platform" == "Ubuntu" ]]; then
             SSH_USER="ubuntu"
         elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
@@ -174,7 +225,7 @@ FOLDER_NAME="customCentos7_9_2009"
 echo ""
 echo "[INFO] Starting OpenSCAP for CentOS Linux 7.9.2009 instances..."
 
-tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
@@ -272,7 +323,7 @@ FOLDER_NAME="customAmazon2"
 echo ""
 echo "[INFO] Processing Amazon Linux 2 instances..."
 
-tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
@@ -368,12 +419,11 @@ SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 mkdir -p "$REPORT_DEST"
 FOLDER_NAME="customAmazon2023"
-SSM_FILE="${SCRIPT_DIR}/ssm.txt"
 
 echo ""
 echo "[INFO] Starting OpenSCAP for Amazon Linux 2023 instances..."
 
-tail -n +2 "$SSM_FILE" | while IFS=, read -r name ip platform version; do
+tail -n +2 "$FINAL_SSM_FILE" | while IFS=, read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 
@@ -488,7 +538,7 @@ FOLDER_NAME="customUbuntu2204"
 echo ""
 echo "[INFO] Starting OpenSCAP for Ubuntu 22.04 instances..."
 
-tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
+tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; do
     platform=$(echo "$platform" | tr -d '"')
     version=$(echo "$version" | tr -d '"')
 

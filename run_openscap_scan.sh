@@ -70,6 +70,7 @@ done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
+mkdir -p "$REPORT_DEST"
 FOLDER_NAME="customCentos7_6_1810"
 
 echo ""
@@ -167,6 +168,7 @@ done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
+mkdir -p "$REPORT_DEST"
 FOLDER_NAME="customCentos7_9_2009"
 
 echo ""
@@ -264,6 +266,7 @@ done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
+mkdir -p "$REPORT_DEST"
 FOLDER_NAME="customAmazon2"
 
 echo ""
@@ -363,6 +366,7 @@ done
 # Amazon Linux 2023 - OpenSCAP Scan Section
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
+mkdir -p "$REPORT_DEST"
 FOLDER_NAME="customAmazon2023"
 SSM_FILE="${SCRIPT_DIR}/ssm.txt"
 
@@ -478,6 +482,7 @@ done
 
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
+mkdir -p "$REPORT_DEST"
 FOLDER_NAME="customUbuntu2204"
 
 echo ""

@@ -153,7 +153,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
             echo "[DONE] Final report generated successfully."
 
             echo "[SCP] Copying report to $REPORT_DEST..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/report_${ip}.html"
 
             echo "[CLEANUP] Removing report from remote server..."
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo rm -f /tmp/$FOLDER_NAME/report_${ip}.html"
@@ -249,7 +249,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
             echo "[DONE] Final report generated successfully."
 
             echo "[SCP] Copying report to $REPORT_DEST..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/report_${ip}.html"
 
             echo "[CLEANUP] Removing report from remote server..."
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo rm -f /tmp/$FOLDER_NAME/report_${ip}.html"
@@ -348,7 +348,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
             echo "[DONE] Final report generated successfully."
 
             echo "[SCP] Copying report to $REPORT_DEST..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/report_${ip}.html"
 
             echo "[CLEANUP] Removing report from remote server..."
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo rm -f /tmp/$FOLDER_NAME/report_${ip}.html"
@@ -465,7 +465,7 @@ tail -n +2 "$SSM_FILE" | while IFS=, read -r name ip platform version; do
 
         echo "[SCP] Copying report to $REPORT_DEST..."
         mkdir -p "$REPORT_DEST"
-        if scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/"; then
+        if scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/report_${ip}.html"; then
             echo "[CLEANUP] Removing report from remote server..."
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo rm -f /tmp/$FOLDER_NAME/report_${ip}.html"
             echo "[OK] Completed for $ip"
@@ -585,7 +585,7 @@ tail -n +2 "$SSM_FILE" | while IFS=',' read -r name ip platform version; do
               /tmp/$FOLDER_NAME/ssg-ubuntu2204-ds.xml"
 
             echo "[SCP] Copying final report to $REPORT_DEST..."
-            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/"
+            scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip:/tmp/$FOLDER_NAME/report_${ip}.html" "$REPORT_DEST/report_${ip}.html"
 
             ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo rm -f /tmp/$FOLDER_NAME/report_${ip}.html"
             echo "[OK] Completed for $ip"

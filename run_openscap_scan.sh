@@ -161,7 +161,14 @@ setup_openscan_user() {
         ssh -n -i "$ssh_key" "$initial_user@$ip" "sudo usermod -aG wheel $openscan_user"
     fi
     
-    # 3. Create .ssh directory for the new user
+    # 3. Enable passwordless sudo for openscan user
+    echo "[SETUP] Enabling passwordless sudo for $openscan_user..."
+    ssh -n -i "$ssh_key" "$initial_user@$ip" "
+        echo \"$openscan_user ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/99-openscan-nopasswd > /dev/null &&
+        sudo chmod 0440 /etc/sudoers.d/99-openscan-nopasswd
+    "
+
+    # 4. Create .ssh directory for the new user
     # Note: Using '/home/$initial_user' for authorized_keys location is an assumption.
     ssh -n -i "$ssh_key" "$initial_user@$ip" "
         sudo mkdir -p /home/$openscan_user/.ssh &&
@@ -169,7 +176,7 @@ setup_openscan_user() {
         sudo chown -R $openscan_user:$openscan_user /home/$openscan_user/.ssh
     "
 
-    # 4. Deploy SSH Key by copying the authorized_keys file from the initial user
+    # 5. Deploy SSH Key by copying the authorized_keys file from the initial user
     # This is the most reliable way to ensure the Jenkins key works for the new user.
     ssh -n -i "$ssh_key" "$initial_user@$ip" "
         if [ -f \"/home/$initial_user/.ssh/authorized_keys\" ]; then

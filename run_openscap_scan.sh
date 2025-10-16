@@ -45,7 +45,13 @@ echo "--------------------------------------------------"
 # STEP 2: Filter the discovered list based on Jenkins parameters.
 #
 HEADER=$(head -n 1 "$SSM_FILE")
-BODY=$(tail -n +2 "$SSM_FILE")
+# --- FIX: Ensure BODY content is read correctly and is trimmed ---
+# Read content from the second line onwards. Using 'cat' is more reliable than 'tail'
+# for piping into a variable across different shell environments.
+BODY=$(cat "$SSM_FILE" | tail -n +2)
+BODY="${BODY#"${BODY%%[![:space:]]*}"}" # Trim leading whitespace
+BODY="${BODY%"${BODY##*[![:space:]]}"}" # Trim trailing whitespace
+# ---------------------------------------------------------------
 
 # OS Filtering
 if [[ -n "$OS_TYPE" && "$OS_TYPE" != "All" ]]; then
@@ -59,15 +65,13 @@ if [[ -n "$OS_TYPE" && "$OS_TYPE" != "All" ]]; then
         "Rocky Linux") OS_FILTER="Rocky Linux" ;;
     esac
     
-    # --- FIX: Use awk to filter reliably by column 3 (PlatformName) ---
-    # Apply filtering only if BODY contains data
+    # Use awk to filter reliably by column 3 (PlatformName)
     if [[ -n "$BODY" ]]; then
         BODY=$(echo "$BODY" | awk -F',' -v os_filter="$OS_FILTER" '
             # Match PlatformName (column 3, stripping quotes)
             tolower(gensub(/"/, "", "g", $3)) ~ tolower(os_filter) { print $0 }
         ' || true)
     fi
-    # -----------------------------------------------------------------
 fi
 
 # Version Filtering
@@ -83,15 +87,13 @@ fi
 if [[ -n "$VERSION_FILTER" ]]; then
     echo "[FILTER] Filtering by Version: $VERSION_FILTER"
     
-    # --- FIX: Use awk to filter reliably by column 4 (PlatformVersion) ---
-    # Apply filtering only if BODY contains data
+    # Use awk to filter reliably by column 4 (PlatformVersion)
     if [[ -n "$BODY" ]]; then
         BODY=$(echo "$BODY" | awk -F',' -v ver_filter="\"$VERSION_FILTER\"" '
             # Match PlatformVersion (column 4, including quotes)
             $4 ~ ver_filter { print $0 }
         ' || true)
     fi
-    # -------------------------------------------------------------------
 fi
 
 # IP Exclusion Filtering

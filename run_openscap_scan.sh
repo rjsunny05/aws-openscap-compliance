@@ -60,10 +60,13 @@ if [[ -n "$OS_TYPE" && "$OS_TYPE" != "All" ]]; then
     esac
     
     # --- FIX: Use awk to filter reliably by column 3 (PlatformName) ---
-    BODY=$(echo "$BODY" | awk -F',' -v os_filter="$OS_FILTER" '
-        # Match PlatformName (column 3, stripping quotes)
-        tolower(gensub(/"/, "", "g", $3)) ~ tolower(os_filter) { print $0 }
-    ' || true)
+    # Apply filtering only if BODY contains data
+    if [[ -n "$BODY" ]]; then
+        BODY=$(echo "$BODY" | awk -F',' -v os_filter="$OS_FILTER" '
+            # Match PlatformName (column 3, stripping quotes)
+            tolower(gensub(/"/, "", "g", $3)) ~ tolower(os_filter) { print $0 }
+        ' || true)
+    fi
     # -----------------------------------------------------------------
 fi
 
@@ -79,11 +82,15 @@ fi
 
 if [[ -n "$VERSION_FILTER" ]]; then
     echo "[FILTER] Filtering by Version: $VERSION_FILTER"
+    
     # --- FIX: Use awk to filter reliably by column 4 (PlatformVersion) ---
-    BODY=$(echo "$BODY" | awk -F',' -v ver_filter="\"$VERSION_FILTER\"" '
-        # Match PlatformVersion (column 4, including quotes)
-        $4 ~ ver_filter { print $0 }
-    ' || true)
+    # Apply filtering only if BODY contains data
+    if [[ -n "$BODY" ]]; then
+        BODY=$(echo "$BODY" | awk -F',' -v ver_filter="\"$VERSION_FILTER\"" '
+            # Match PlatformVersion (column 4, including quotes)
+            $4 ~ ver_filter { print $0 }
+        ' || true)
+    fi
     # -------------------------------------------------------------------
 fi
 
@@ -179,7 +186,6 @@ setup_openscan_user() {
     "
 
     # 4. Create .ssh directory for the new user
-    # Note: Using '/home/$initial_user' for authorized_keys location is an assumption.
     ssh -n -i "$ssh_key" "$initial_user@$ip" "
         sudo mkdir -p /home/$openscan_user/.ssh &&
         sudo chmod 700 /home/$openscan_user/.ssh &&
@@ -187,7 +193,6 @@ setup_openscan_user() {
     "
 
     # 5. Deploy SSH Key by copying the authorized_keys file from the initial user
-    # This is the most reliable way to ensure the Jenkins key works for the new user.
     ssh -n -i "$ssh_key" "$initial_user@$ip" "
         if [ -f \"/home/$initial_user/.ssh/authorized_keys\" ]; then
             sudo cp /home/$initial_user/.ssh/authorized_keys /home/$openscan_user/.ssh/authorized_keys

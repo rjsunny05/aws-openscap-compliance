@@ -58,7 +58,13 @@ if [[ -n "$OS_TYPE" && "$OS_TYPE" != "All" ]]; then
         "Amazon Linux") OS_FILTER="Amazon Linux" ;;
         "Rocky Linux") OS_FILTER="Rocky Linux" ;;
     esac
-    BODY=$(echo "$BODY" | grep "$OS_FILTER" || true)
+    
+    # --- FIX: Use awk to filter reliably by column 3 (PlatformName) ---
+    BODY=$(echo "$BODY" | awk -F',' -v os_filter="$OS_FILTER" '
+        # Match PlatformName (column 3, stripping quotes)
+        tolower(gensub(/"/, "", "g", $3)) ~ tolower(os_filter) { print $0 }
+    ' || true)
+    # -----------------------------------------------------------------
 fi
 
 # Version Filtering
@@ -73,7 +79,12 @@ fi
 
 if [[ -n "$VERSION_FILTER" ]]; then
     echo "[FILTER] Filtering by Version: $VERSION_FILTER"
-    BODY=$(echo "$BODY" | grep ",\"$VERSION_FILTER\"" || true)
+    # --- FIX: Use awk to filter reliably by column 4 (PlatformVersion) ---
+    BODY=$(echo "$BODY" | awk -F',' -v ver_filter="\"$VERSION_FILTER\"" '
+        # Match PlatformVersion (column 4, including quotes)
+        $4 ~ ver_filter { print $0 }
+    ' || true)
+    # -------------------------------------------------------------------
 fi
 
 # IP Exclusion Filtering
@@ -139,7 +150,6 @@ determine_ssh_user() {
 }
 
 # Function to create the 'openscan' user and deploy the SSH key
-# Uses the initial_user for connection, but prepares the 'openscan' user.
 setup_openscan_user() {
     local ip="$1"
     local platform="$2"

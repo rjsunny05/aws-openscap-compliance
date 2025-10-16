@@ -56,7 +56,7 @@ if [[ -n "$OS_TYPE" && "$OS_TYPE" != "All" ]]; then
         "RHEL") OS_FILTER="Red Hat Enterprise Linux" ;;
         "Ubuntu") OS_FILTER="Ubuntu" ;;
         "Amazon Linux") OS_FILTER="Amazon Linux" ;;
-        "Rocky Linux") OS_FILTER="Rocky Linux" ;; # ADDED: Rocky Linux
+        "Rocky Linux") OS_FILTER="Rocky Linux" ;;
     esac
     BODY=$(echo "$BODY" | grep "$OS_FILTER" || true)
 fi
@@ -67,7 +67,7 @@ if [[ "$OS_TYPE" == "Ubuntu" && -n "$UBUNTU_VERSION" && "$UBUNTU_VERSION" != "N/
     VERSION_FILTER=$UBUNTU_VERSION
 elif [[ "$OS_TYPE" == "Amazon Linux" && -n "$AMAZON_LINUX_VERSION" && "$AMAZON_LINUX_VERSION" != "N/A" ]]; then
     VERSION_FILTER=$AMAZON_LINUX_VERSION
-elif [[ "$OS_TYPE" == "Rocky Linux" && -n "$ROCKY_LINUX_VERSION" && "$ROCKY_LINUX_VERSION" != "N/A" ]]; then # ADDED: Rocky Linux Version
+elif [[ "$OS_TYPE" == "Rocky Linux" && -n "$ROCKY_LINUX_VERSION" && "$ROCKY_LINUX_VERSION" != "N/A" ]]; then
     VERSION_FILTER=$ROCKY_LINUX_VERSION
 fi
 
@@ -106,7 +106,7 @@ declare -A platform_filters=(
   ["CentOS Linux 7.9.2009"]="CentOS Linux|7.9.2009"
   ["CentOS Linux 7.6.1810"]="CentOS Linux|7.6.1810"
   ["Red Hat Enterprise Linux Server 7.9"]="Red Hat Enterprise Linux Server|7.9"
-  ["Rocky Linux 9"]="Rocky Linux|9" # ADDED: Rocky Linux 9
+  ["Rocky Linux 9"]="Rocky Linux|9"
   ["Ubuntu 22.04"]="Ubuntu|22.04"
 )
 
@@ -122,22 +122,65 @@ for label in "${!platform_filters[@]}"; do
   echo ""
 done
 
-#
-# Reusable function to determine SSH User
-#
+# --- NEW FUNCTIONS FOR USER MANAGEMENT ---
+
+# Function to determine the default AMI SSH user
 determine_ssh_user() {
     local platform="$1"
-    local SSH_USER=""
     if [[ "$platform" == "Ubuntu" ]]; then
-        SSH_USER="ubuntu"
+        echo "ubuntu"
     elif [[ "$platform" == "Amazon Linux" || "$platform" == "Red Hat Enterprise Linux" ]]; then
-        SSH_USER="ec2-user"
+        echo "ec2-user"
     elif [[ "$platform" == "CentOS Linux" ]]; then
-        SSH_USER="centos"
-    elif [[ "$platform" == "Rocky Linux" ]]; then # ADDED: Rocky Linux
-        SSH_USER="rocky"
+        echo "centos"
+    elif [[ "$platform" == "Rocky Linux" ]]; then
+        echo "rocky"
     fi
-    echo "$SSH_USER"
+}
+
+# Function to create the 'openscan' user and deploy the SSH key
+# Uses the initial_user for connection, but prepares the 'openscan' user.
+setup_openscan_user() {
+    local ip="$1"
+    local platform="$2"
+    local initial_user="$3"
+    local ssh_key="$4"
+    local openscan_user="openscan"
+
+    echo "[SETUP] Configuring dedicated user '$openscan_user' on $ip (via $initial_user)..."
+
+    # 1. Create the user 'openscan' (silently handles if user already exists)
+    ssh -n -i "$ssh_key" "$initial_user@$ip" "sudo useradd -m $openscan_user 2>/dev/null || true"
+
+    # 2. Grant Sudo Access (wheel/sudo group membership)
+    if [[ "$platform" == "Ubuntu" ]]; then
+        # Ubuntu/Debian family
+        ssh -n -i "$ssh_key" "$initial_user@$ip" "sudo usermod -aG sudo $openscan_user"
+    else
+        # RHEL/CentOS/Amazon Linux/Rocky family (using 'wheel' for consistency)
+        ssh -n -i "$ssh_key" "$initial_user@$ip" "sudo usermod -aG wheel $openscan_user"
+    fi
+    
+    # 3. Create .ssh directory for the new user
+    # Note: Using '/home/$initial_user' for authorized_keys location is an assumption.
+    ssh -n -i "$ssh_key" "$initial_user@$ip" "
+        sudo mkdir -p /home/$openscan_user/.ssh &&
+        sudo chmod 700 /home/$openscan_user/.ssh &&
+        sudo chown -R $openscan_user:$openscan_user /home/$openscan_user/.ssh
+    "
+
+    # 4. Deploy SSH Key by copying the authorized_keys file from the initial user
+    # This is the most reliable way to ensure the Jenkins key works for the new user.
+    ssh -n -i "$ssh_key" "$initial_user@$ip" "
+        if [ -f \"/home/$initial_user/.ssh/authorized_keys\" ]; then
+            sudo cp /home/$initial_user/.ssh/authorized_keys /home/$openscan_user/.ssh/authorized_keys
+        elif [ -f \"/root/.ssh/authorized_keys\" ]; then
+            sudo cp /root/.ssh/authorized_keys /home/$openscan_user/.ssh/authorized_keys
+        fi &&
+        sudo chown $openscan_user:$openscan_user /home/$openscan_user/.ssh/authorized_keys &&
+        sudo chmod 600 /home/$openscan_user/.ssh/authorized_keys
+    "
+    echo "[SETUP] SSH key successfully deployed. User context switch is complete."
 }
 
 # --- CentOS Linux 7.6.1810 Scan Section ---
@@ -156,14 +199,20 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; d
     if [[ "$platform" == "CentOS Linux" && "$version" == "7.6.1810" ]]; then
         echo "[TRY] $name ($ip) - CentOS Linux 7.6.1810"
         
-        # DETERMINE SSH USER (UPDATED LOGIC BLOCK)
-        SSH_USER=$(determine_ssh_user "$platform")
-        if [[ -z "$SSH_USER" ]]; then
-            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+        # DETERMINE INITIAL SSH USER
+        INITIAL_SSH_USER=$(determine_ssh_user "$platform")
+        if [[ -z "$INITIAL_SSH_USER" ]]; then
+            echo "[WARN] Could not determine initial SSH user for platform: $platform. Skipping."
             continue
         fi
 
-        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
+        # SETUP NEW USER
+        setup_openscan_user "$ip" "$platform" "$INITIAL_SSH_USER" "$SSH_KEY"
+
+        # SWITCH TO DEDICATED USER FOR REST OF THE SCAN
+        SSH_USER="openscan"
+
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful as $SSH_USER"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
@@ -249,14 +298,20 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; d
     if [[ "$platform" == "CentOS Linux" && "$version" == "7.9.2009" ]]; then
         echo "[TRY] $name ($ip) - CentOS Linux 7.9.2009"
         
-        # DETERMINE SSH USER (UPDATED LOGIC BLOCK)
-        SSH_USER=$(determine_ssh_user "$platform")
-        if [[ -z "$SSH_USER" ]]; then
-            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+        # DETERMINE INITIAL SSH USER
+        INITIAL_SSH_USER=$(determine_ssh_user "$platform")
+        if [[ -z "$INITIAL_SSH_USER" ]]; then
+            echo "[WARN] Could not determine initial SSH user for platform: $platform. Skipping."
             continue
         fi
 
-        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
+        # SETUP NEW USER
+        setup_openscan_user "$ip" "$platform" "$INITIAL_SSH_USER" "$SSH_KEY"
+
+        # SWITCH TO DEDICATED USER FOR REST OF THE SCAN
+        SSH_USER="openscan"
+
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful as $SSH_USER"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
@@ -343,15 +398,21 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; d
     if [[ "$platform" == "Amazon Linux" && "$version" == "2" ]]; then
         echo "[TRY] $name ($ip) - Amazon Linux 2"
         
-        # DETERMINE SSH USER (UPDATED LOGIC BLOCK)
-        SSH_USER=$(determine_ssh_user "$platform")
-        if [[ -z "$SSH_USER" ]]; then
-            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+        # DETERMINE INITIAL SSH USER
+        INITIAL_SSH_USER=$(determine_ssh_user "$platform")
+        if [[ -z "$INITIAL_SSH_USER" ]]; then
+            echo "[WARN] Could not determine initial SSH user for platform: $platform. Skipping."
             continue
         fi
 
+        # SETUP NEW USER
+        setup_openscan_user "$ip" "$platform" "$INITIAL_SSH_USER" "$SSH_KEY"
+
+        # SWITCH TO DEDICATED USER FOR REST OF THE SCAN
+        SSH_USER="openscan"
+
         # SSH Test
-        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful as $SSH_USER"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying $FOLDER_NAME to $ip:/tmp/ ..."
@@ -437,15 +498,21 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=, read -r name ip platform version; do
     if [[ "$platform" == "Amazon Linux" && "$version" == "2023" ]]; then
         echo "[TRY] $name ($ip) - Amazon Linux 2023"
 
-        # DETERMINE SSH USER (UPDATED LOGIC BLOCK)
-        SSH_USER=$(determine_ssh_user "$platform")
-        if [[ -z "$SSH_USER" ]]; then
-            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+        # DETERMINE INITIAL SSH USER
+        INITIAL_SSH_USER=$(determine_ssh_user "$platform")
+        if [[ -z "$INITIAL_SSH_USER" ]]; then
+            echo "[WARN] Could not determine initial SSH user for platform: $platform. Skipping."
             continue
         fi
 
+        # SETUP NEW USER
+        setup_openscan_user "$ip" "$platform" "$INITIAL_SSH_USER" "$SSH_KEY"
+
+        # SWITCH TO DEDICATED USER FOR REST OF THE SCAN
+        SSH_USER="openscan"
+
         # SSH connectivity check
-        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
+        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful as $SSH_USER"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
         else
             echo "[ERROR] SSH failed to $ip"
@@ -531,7 +598,7 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=, read -r name ip platform version; do
     fi
 done
 
-# --- Rocky Linux 9 Scan Section (NEW) ---
+# --- Rocky Linux 9 Scan Section ---
 SSH_KEY="${SSH_KEY_FROM_JENKINS:-/home/khushi.m/key.pem}"
 REPORT_DEST="${SCRIPT_DIR}/openscap_reports"
 mkdir -p "$REPORT_DEST"
@@ -547,22 +614,28 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=, read -r name ip platform version; do
     if [[ "$platform" == "Rocky Linux" && "$version" == "9" ]]; then
         echo "[TRY] $name ($ip) - Rocky Linux 9"
 
-        # DETERMINE SSH USER (UPDATED LOGIC BLOCK)
-        SSH_USER=$(determine_ssh_user "$platform")
-        if [[ -z "$SSH_USER" ]]; then
-            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+        # DETERMINE INITIAL SSH USER
+        INITIAL_SSH_USER=$(determine_ssh_user "$platform")
+        if [[ -z "$INITIAL_SSH_USER" ]]; then
+            echo "[WARN] Could not determine initial SSH user for platform: $platform. Skipping."
             continue
         fi
 
+        # SETUP NEW USER
+        setup_openscan_user "$ip" "$platform" "$INITIAL_SSH_USER" "$SSH_KEY"
+
+        # SWITCH TO DEDICATED USER FOR REST OF THE SCAN
+        SSH_USER="openscan"
+
         # SSH connectivity check
-        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
+        if ssh -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful as $SSH_USER"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
         else
             echo "[ERROR] SSH failed to $ip"
             continue
         fi
 
-        # Ensure OpenSCAP is installed (assuming dnf/yum is used on Rocky)
+        # Ensure OpenSCAP is installed (using dnf)
         echo "[CHECK] Ensuring OpenSCAP is installed on $ip..."
         ssh -n -i "$SSH_KEY" "$SSH_USER@$ip" "sudo dnf install -y openscap-scanner" >/dev/null 2>&1
 
@@ -580,7 +653,7 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=, read -r name ip platform version; do
             --profile xccdf_org.ssgproject.content_profile_standard \
             --tailoring-file /tmp/$FOLDER_NAME/tailoring-xccdf.xml \
             --report /tmp/$FOLDER_NAME/precheck_${ip}.html \
-            /tmp/$FOLDER_NAME/ssg-rl9-ds.xml" 2>&1) # Using ssg-rl9-ds.xml standard for Rocky 9
+            /tmp/$FOLDER_NAME/ssg-rl9-ds.xml" 2>&1)
 
         echo "[INFO] Precheck completed for $ip"
 
@@ -656,14 +729,20 @@ tail -n +2 "$FINAL_SSM_FILE" | while IFS=',' read -r name ip platform version; d
     if [[ "$platform" == "Ubuntu" && "$version" == "22.04" ]]; then
         echo "[TRY] $name ($ip) - Ubuntu 22.04"
         
-        # DETERMINE SSH USER (UPDATED LOGIC BLOCK)
-        SSH_USER=$(determine_ssh_user "$platform")
-        if [[ -z "$SSH_USER" ]]; then
-            echo "[WARN] Could not determine SSH user for platform: $platform. Skipping."
+        # DETERMINE INITIAL SSH USER
+        INITIAL_SSH_USER=$(determine_ssh_user "$platform")
+        if [[ -z "$INITIAL_SSH_USER" ]]; then
+            echo "[WARN] Could not determine initial SSH user for platform: $platform. Skipping."
             continue
         fi
 
-        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful"; then
+        # SETUP NEW USER
+        setup_openscan_user "$ip" "$platform" "$INITIAL_SSH_USER" "$SSH_KEY"
+
+        # SWITCH TO DEDICATED USER FOR REST OF THE SCAN
+        SSH_USER="openscan"
+
+        if ssh -vvv -n -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$ip" "echo SSH successful as $SSH_USER"; then
             echo "[OK] SSH successful to $ip as $SSH_USER"
 
             echo "[COPY] Copying folder $FOLDER_NAME to $ip:/tmp/ ..."
